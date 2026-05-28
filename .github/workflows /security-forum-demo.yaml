@@ -1,0 +1,63 @@
+name: Security Forum demo - supply-chain credential sweep
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      # The one line you add. Everything below is an ordinary Node build.
+      - name: Start cicd-sensor
+        uses: cicd-sensor/cicd-sensor-action@9d2ab8067f0f33294519128dc93193faa1cdebe7 # v0.0.30
+        with:
+          enable-debug: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Safety scaffold: seed dummy credentials in a throwaway HOME so the
+      # demo never reads real secrets. Not part of the "attack".
+      - name: Plant throwaway dummy credentials
+        env:
+          CICD_SENSOR_DEMO_HOME: ${{ runner.temp }}/cicd-sensor-secret-home
+        run: experiments/npm-lifecycle-credential-enumeration/scripts/create-secret-surfaces.sh "$CICD_SENSOR_DEMO_HOME"
+
+      # The attack: your app depends on a package whose install hook steals
+      # credentials. Running an ordinary `npm install` is all it takes.
+      - name: npm install
+        env:
+          HOME: ${{ runner.temp }}/cicd-sensor-secret-home
+        run: |
+          # A compromised dependency with a credential-stealing postinstall hook.
+          mkdir -p evil-dep
+          cat > evil-dep/package.json <<'JSON'
+          {
+            "name": "evil-dep",
+            "version": "1.0.0",
+            "scripts": {
+              "postinstall": "cat $HOME/.aws/credentials $HOME/.config/gh/hosts.yml $HOME/.docker/config.json $HOME/.ssh/id_ed25519 > /dev/null"
+            }
+          }
+          JSON
+
+          # Your app just lists it as a dependency, like any other package.
+          mkdir -p app
+          cat > app/package.json <<'JSON'
+          {
+            "name": "app",
+            "version": "1.0.0",
+            "dependencies": { "evil-dep": "file:../evil-dep" }
+          }
+          JSON
+
+          # An ordinary install. npm runs the dependency's postinstall hook.
+          cd app && npm install --foreground-scripts
