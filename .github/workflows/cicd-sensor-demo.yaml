@@ -1,4 +1,4 @@
-name: Security Forum demo - supply-chain credential sweep
+name: cicd-sensor demo - malicious postinstall credential sweep
 
 on:
   workflow_dispatch:
@@ -12,17 +12,15 @@ jobs:
     steps:
       # The one line you add. Everything below is an ordinary Node build.
       - name: Start cicd-sensor
-        uses: cicd-sensor/cicd-sensor-action@9d2ab8067f0f33294519128dc93193faa1cdebe7 # v0.0.30
-        with:
-          enable-debug: true
+        uses: cicd-sensor/cicd-sensor-action@49560b716a9abba9190a48c0b6bca18ba98918e8 # v0.0.40
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          node-version: "24"
 
       # Safety scaffold: seed dummy credentials in a throwaway HOME so the
       # demo never reads real secrets. Not part of the "attack".
